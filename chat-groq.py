@@ -15,7 +15,7 @@ else:
 st.title("Chatbot using Groq API")
 
 # Model selection
-model = st.selectbox("Choose a model:", ["llama2-70b-4096", "mixtral-8x7b-32768"])
+model = st.selectbox("Choose a model:", ["llama-3.1-8b-instant", "mixtral-8x7b-32768"])
 
 # Initialize chat history
 if "messages" not in st.session_state:
