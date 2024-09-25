@@ -1,24 +1,55 @@
 import streamlit as st
-import requests
+import groq
+import os
 
-st.title("Groq LLM Chatbot")
+# Initialize Groq client
+if 'GROQ_API_KEY' in st.secrets:
+    client = groq.Groq(api_key=st.secrets['GROQ_API_KEY'])
+elif 'GROQ_API_KEY' in os.environ:
+    client = groq.Groq(api_key=os.environ['GROQ_API_KEY'])
+else:
+    st.error("Groq API key not found. Please set it in Streamlit secrets or as an environment variable.")
+    st.stop()
 
-user_input = st.text_input("You:", "")
+# Streamlit app
+st.title("Chatbot using Groq API")
 
-def get_groq_response(user_message):
-    api_key = st.secrets["general"]["groq_api_key"]  # Accessing the API key from secrets
-    url = "https://api.groq.com/v1/chat"  # Example endpoint
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "message": user_message
-    }
+# Model selection
+model = st.selectbox("Choose a model:", ["llama2-70b-4096", "mixtral-8x7b-32768"])
 
-    response = requests.post(url, headers=headers, json=payload)
-    return response.json().get("response", "Sorry, I didn't get that.")
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
-if user_input:
-    response = get_groq_response(user_input)
-    st.text_area("Bot:", value=response, height=200)
+# Display chat history
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.markdown(message["content"])
+
+# User input
+if prompt := st.chat_input("What is your question?"):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    # Generate response
+    with st.chat_message("assistant"):
+        message_placeholder = st.empty()
+        full_response = ""
+        for response in client.chat.completions.create(
+            messages=[
+                {"role": m["role"], "content": m["content"]}
+                for m in st.session_state.messages
+            ],
+            model=model,
+            stream=True,
+        ):
+            full_response += (response.choices[0].delta.content or "")
+            message_placeholder.markdown(full_response + "▌")
+        message_placeholder.markdown(full_response)
+    st.session_state.messages.append({"role": "assistant", "content": full_response})
+
+# Clear chat history
+if st.button("Clear Chat History"):
+    st.session_state.messages = []
+    st.experimental_rerun()
